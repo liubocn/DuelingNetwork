@@ -7,7 +7,7 @@ import numpy as np
 import rlglue.RLGlue as RLGlue
 import csv
 
-max_learningEpisode = 510
+max_learningEpisode = 3010
 
 whichEpisode = 0
 learningEpisode = 0
