@@ -16,6 +16,7 @@ from chainer import cuda, FunctionSet, Variable, optimizers, serializers, functi
 from chainer.utils import type_check
 import chainer.functions as F
 import relu_mean
+import bilinear_dn_link
 
 from rlglue.agent.Agent import Agent
 from rlglue.agent import AgentLoader as AgentLoader
@@ -53,12 +54,12 @@ class DN_class:
             l3=F.Convolution2D(64, 64, ksize=3, stride=1, nobias=False, wscale=np.sqrt(2)),
             l4=F.Linear(3136, 256, wscale=np.sqrt(2)),
             l5=F.Linear(3136, 256, wscale=np.sqrt(2)),
-            l6=F.Linear(256, 1, wscale=np.sqrt(2)),
-            l7=F.Linear(256, self.num_of_actions, wscale=np.sqrt(2)),
-
-            q_value=F.Bilinear(1, self.num_of_actions, self.num_of_actions,
-                             initialW=np.zeros((1, self.num_of_actions, self.num_of_actions),
-                                               dtype=np.float32))
+            l6=F.Linear(256, 1, initialW=np.ones((1, 256), dtype=np.float32)),
+            l7=F.Linear(256, self.num_of_actions, initialW=np.ones((self.num_of_actions, 256),
+                                               dtype=np.float32)),
+            q_value=bilinear_dn_link.Bilinear(1, self.num_of_actions, self.num_of_actions, nobias = False,
+                             initialW=np.zeros((1, self.num_of_actions, self.num_of_actions), 
+                                               dtype=np.float32), initial_bias = None)
         ).to_gpu()
         
         if args.resumemodel:
@@ -178,6 +179,7 @@ class DN_class:
             self.optimizer.update()
 
     def Q_func(self, state):
+        print 'now Q_func is implemented'
         h1 = F.relu(self.model.l1(state / 254.0))  # scale inputs in [0.0 1.0]
         h2 = F.relu(self.model.l2(h1))
         h3 = F.relu(self.model.l3(h2))
@@ -189,6 +191,7 @@ class DN_class:
         return Q
 
     def Q_func_target(self, state):
+        print 'now Q_func_target is implemented'
         h1 = F.relu(self.model_target.l1(state / 254.0))  # scale inputs in [0.0 1.0]
         h2 = F.relu(self.model_target.l2(h1))
         h3 = F.relu(self.model_target.l3(h2))
@@ -308,7 +311,6 @@ class dn_agent(Agent):  # RL-glue Process
 
         # Simple text based visualization
         print ' Time Step %d /   ACTION  %d  /   REWARD %.1f   / EPSILON  %.6f  /   Q_max  %3f' % (self.time, self.DN.action_to_index(action), np.sign(reward), eps, np.max(Q_now.get()))
-
         # Updates for next step
         self.last_observation = obs_array
 
