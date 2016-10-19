@@ -15,8 +15,9 @@ import scipy.misc as spm
 from chainer import cuda, FunctionSet, Variable, optimizers, serializers, function, utils
 from chainer.utils import type_check
 import chainer.functions as F
-import relu_mean
-import bilinear_dn_link
+#import relu_mean
+#import bilinear_dn_link
+import DN_out
 
 from rlglue.agent.Agent import Agent
 from rlglue.agent import AgentLoader as AgentLoader
@@ -54,12 +55,10 @@ class DN_class:
             l3=F.Convolution2D(64, 64, ksize=3, stride=1, nobias=False, wscale=np.sqrt(2)),
             l4=F.Linear(3136, 256, wscale=np.sqrt(2)),
             l5=F.Linear(3136, 256, wscale=np.sqrt(2)),
-            l6=F.Linear(256, 1, initialW=np.ones((1, 256), dtype=np.float32)),
-            l7=F.Linear(256, self.num_of_actions, initialW=np.ones((self.num_of_actions, 256),
+            l6=F.Linear(256, 1, initialW=np.zeros((1, 256), dtype=np.float32)),
+            l7=F.Linear(256, self.num_of_actions, initialW=np.zeros((self.num_of_actions, 256),
                                                dtype=np.float32)),
-            q_value=bilinear_dn_link.Bilinear(1, self.num_of_actions, self.num_of_actions, nobias = False,
-                             initialW=np.zeros((1, self.num_of_actions, self.num_of_actions), 
-                                               dtype=np.float32), initial_bias = None)
+            q_value=DN_out.DN_out(1, self.num_of_actions, self.num_of_actions, nobias = True)
         ).to_gpu()
         
         if args.resumemodel:
@@ -185,8 +184,8 @@ class DN_class:
         h3 = F.relu(self.model.l3(h2))
         h4 = F.relu(self.model.l4(h3)) # left side connected with s value
         h5 = F.relu(self.model.l5(h3)) # right side connected with A value
-        h6 = F.relu(self.model.l6(h4)) # s value
-        h7 = relu_mean.relu_Mean(self.model.l7(h5)) # A value
+        h6 = self.model.l6(h4) # s value
+        h7 = self.model.l7(h5) # A value
         Q = self.model.q_value(h6, h7) # Q value
         return Q
 
@@ -197,8 +196,8 @@ class DN_class:
         h3 = F.relu(self.model_target.l3(h2))
         h4 = F.relu(self.model_target.l4(h3)) # left side connected with s value
         h5 = F.relu(self.model_target.l5(h3)) # right side connected with A value
-        h6 = F.relu(self.model_target.l6(h4)) # s value
-        h7 = relu_mean.relu_Mean(self.model_target.l7(h5))
+        h6 = self.model_target.l6(h4) # s value
+        h7 = self.model_target.l7(h5) # A value
         Q = self.model_target.q_value(h6, h7) # Q value
         return Q
 
