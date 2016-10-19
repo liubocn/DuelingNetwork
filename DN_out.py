@@ -2,12 +2,12 @@ import numpy
 
 from chainer import cuda
 #from chainer.functions.connection import bilinear
+import DN_out_func
 from chainer import initializers
 from chainer import link
-import bilinear_dn_function
 
 
-class Bilinear(link.Link):
+class DN_out(link.Link):
 
     """Bilinear layer that performs tensor multiplication.
 
@@ -52,7 +52,7 @@ class Bilinear(link.Link):
 
     def __init__(self, left_size, right_size, out_size, nobias=False,
                  initialW=None, initial_bias=None):
-        super(Bilinear, self).__init__(W=(left_size, right_size, out_size))
+        super(DN_out, self).__init__(W=(left_size, right_size, out_size))
         self.in_sizes = (left_size, right_size)
         self.nobias = nobias
 
@@ -62,7 +62,7 @@ class Bilinear(link.Link):
         # that of Linear function.
 
         if isinstance(initialW, (numpy.ndarray, cuda.ndarray)):
-            assert initialW.shape == self.W.data.shape
+            assert initialW.shape == self.W.shape
         initializers.init_weight(self.W.data, initialW)
 
         if not self.nobias:
@@ -73,36 +73,23 @@ class Bilinear(link.Link):
             if isinstance(initial_bias, tuple):
                 V1, V2, b = initial_bias
             elif initial_bias is None:
-                #V1 = V2 = None
-                V1 = numpy.ones((left_size, out_size), dtype = numpy.float32)
-                V2 = numpy.matrix((numpy.identity(right_size)), dtype = numpy.float32)
+                V1 = V2 = None
                 b = 0
             else:
                 raise ValueError('initial_bias must be tuple or None')
 
             if isinstance(V1, (numpy.ndarray, cuda.ndarray)):
-                assert V1.shape == self.V1.data.shape
+                assert V1.shape == self.V1.shape
             if isinstance(V2, (numpy.ndarray, cuda.ndarray)):
-                assert V2.shape == self.V2.data.shape
+                assert V2.shape == self.V2.shape
             if isinstance(b, (numpy.ndarray, cuda.ndarray)):
-                assert b.shape == self.b.data.shape
+                assert b.shape == self.b.shape
             initializers.init_weight(self.V1.data, V1)
             initializers.init_weight(self.V2.data, V2)
             initializers.init_weight(self.b.data, b)
 
-        else:
-            self.V1.data[...] = numpy.ones((left_size, out_size), dtype = numpy.float32)
-            self.V2.data[...] = numpy.matrix((numpy.identity(right_size)), dtype = numpy.float32)
-            self.b.data.fill(0)
-
-        self.left_size = left_size
-        self.right_size = right_size
-        self.out_size = out_size
-
-
     def __call__(self, e1, e2):
-        """
-        Applies the bilinear function to inputs and the internal parameters.
+        """Applies the bilinear function to inputs and the internal parameters.
 
         Args:
             e1 (~chainer.Variable): Left input.
@@ -112,20 +99,10 @@ class Bilinear(link.Link):
             ~chainer.Variable: Output variable.
 
         """
-        V1_tmp = numpy.ones((self.left_size, self.out_size), dtype = numpy.float32)
-        V2_tmp = numpy.matrix((numpy.identity(self.right_size)), dtype = numpy.float32)
-        b_tmp = numpy.zeros(self.out_size, dtype = numpy.float32)
-        W_tmp = numpy.zeros((self.left_size, self.right_size, self.out_size), dtype = numpy.float32)
-
-        self.V1.data = cuda.to_gpu(V1_tmp)
-        self.V2.data = cuda.to_gpu(V2_tmp)
-        self.b.data = cuda.to_gpu(b_tmp)
-        self.W.data = cuda.to_gpu(W_tmp)
-        
         if self.nobias:
-            return bilinear_dn_function.bilinear(e1, e2, self.W)
+            return DN_out_func.dn_outfunc(e1, e2, self.W)
         else:
-            return bilinear_dn_function.bilinear(e1, e2, self.W, self.V1, self.V2, self.b)
+            return DN_out_func.dn_outfunc(e1, e2, self.W, self.V1, self.V2, self.b)
 
     def zero_grads(self):
         # Left for backward compatibility
